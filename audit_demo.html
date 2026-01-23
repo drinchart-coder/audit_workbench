@@ -1,0 +1,229 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditPro Workbench - 一站式审计工作台</title>
+    
+    <!-- 使用高度兼容的 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.20/babel.min.js"></script>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.run/@google/genai@1.38.0"
+      }
+    }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;900&display=swap');
+        
+        :root {
+            --bg-main: #050505;
+            --bg-card: #0a0a0a;
+            --accent-blue: #3b82f6;
+            --border-zinc: #18181b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: #e4e4e7;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border-zinc);
+        }
+
+        .glow-button:hover {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .tab-active {
+            color: var(--accent-blue);
+            border-bottom: 2px solid var(--accent-blue);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        const { useState, useEffect, useRef } = React;
+
+        // --- Mock Data ---
+        const AGENTS = [
+            { id: '1', name: '合规校验专家', role: '负责审计准则对比' },
+            { id: '2', name: '风险扫描引擎', role: '负责发现财报舞弊点' }
+        ];
+
+        // --- Main App ---
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('AI');
+            const [files, setFiles] = useState([
+                { id: '1', name: '2023年度资产负债表.xlsx', size: '2.4MB', type: 'EXCEL' },
+                { id: '2', name: '外部询证函回函记录.pdf', size: '1.1MB', type: 'PDF' }
+            ]);
+            const [chat, setChat] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            // AI 交互逻辑
+            const handleSend = async () => {
+                if (!input.trim()) return;
+                const userMsg = { role: 'user', content: input };
+                setChat([...chat, userMsg]);
+                setInput('');
+                setLoading(true);
+
+                try {
+                    const ai = new GoogleGenAI({ apiKey: window.process?.env?.API_KEY || '' });
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-3-flash-preview',
+                        contents: `作为专业审计助手，回答：${input}`,
+                    });
+                    setChat(prev => [...prev, { role: 'assistant', content: response.text }]);
+                } catch (e) {
+                    setChat(prev => [...prev, { role: 'assistant', content: "AI模块初始化中... (请检查API配置或网络环境)" }]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-screen select-none">
+                    {/* Top Bar */}
+                    <nav className="h-14 border-b border-zinc-800 bg-black flex items-center justify-between px-6 shrink-0">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-black text-xs">AP</div>
+                            <span className="text-sm font-black uppercase tracking-tighter">AuditPro <span className="text-zinc-600">Workbench</span></span>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <span className="text-[10px] text-zinc-500 font-mono">NODE_TX: 0x42...88</span>
+                            <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 overflow-hidden">
+                                <img src="https://api.dicebear.com/7.x/bottts/svg?seed=demo" alt="avatar" />
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Content */}
+                    <div className="flex-1 flex overflow-hidden">
+                        {/* Left: Files */}
+                        <aside className="w-64 glass-panel flex flex-col p-4 shrink-0">
+                            <h4 className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-4">审计档案管理</h4>
+                            <button className="w-full py-3 mb-6 border border-zinc-800 rounded-xl text-[10px] font-bold uppercase hover:bg-zinc-900 transition-colors">
+                                + 上传审计资料
+                            </button>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                                {files.map(f => (
+                                    <div key={f.id} className="p-3 bg-zinc-900/40 border border-zinc-800 rounded-xl hover:border-blue-500/50 transition-all cursor-pointer group">
+                                        <p className="text-xs font-semibold text-zinc-300 truncate">{f.name}</p>
+                                        <p className="text-[9px] text-zinc-600 mt-1 uppercase font-mono">{f.type} • {f.size}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </aside>
+
+                        {/* Middle: Editor */}
+                        <main className="flex-1 bg-black flex flex-col p-8 overflow-y-auto custom-scrollbar">
+                            <div className="max-w-4xl w-full mx-auto">
+                                <div className="flex justify-between items-center mb-10">
+                                    <h2 className="text-3xl font-black tracking-tighter">工作底稿填写</h2>
+                                    <button className="px-5 py-2 bg-white text-black text-xs font-black rounded-lg glow-button transition-all">导出成果</button>
+                                </div>
+                                
+                                <div className="space-y-8">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">审计程序录入</label>
+                                        <input className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-4 text-sm outline-none focus:border-blue-500/50 transition-all" placeholder="请输入本次实施的审计程序..." />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">审计过程与证据</label>
+                                        <textarea rows={12} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-4 text-sm outline-none focus:border-blue-500/50 transition-all resize-none" placeholder="记录详细的审计实施过程..." />
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+
+                        {/* Right: AI & Data */}
+                        <aside className="w-96 glass-panel border-l border-zinc-800 flex flex-col shrink-0">
+                            <div className="flex border-b border-zinc-800">
+                                <button onClick={() => setActiveTab('AI')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest ${activeTab === 'AI' ? 'tab-active' : 'text-zinc-600'}`}>AI 智能交互</button>
+                                <button onClick={() => setActiveTab('ANALYSIS')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest ${activeTab === 'ANALYSIS' ? 'tab-active' : 'text-zinc-600'}`}>非现场分析</button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                                {activeTab === 'AI' ? (
+                                    <div className="space-y-4">
+                                        {chat.length === 0 && (
+                                            <div className="text-center py-20 opacity-20">
+                                                <p className="text-xs font-bold uppercase">等待指令...</p>
+                                            </div>
+                                        )}
+                                        {chat.map((m, i) => (
+                                            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`max-w-[85%] p-3 rounded-2xl text-[11px] leading-relaxed ${m.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-tl-none'}`}>
+                                                    {m.content}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {loading && <div className="text-[10px] text-zinc-600 animate-pulse font-mono px-2">AGENT_THINKING...</div>}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                                        <div className="w-16 h-16 bg-purple-600/10 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/20">
+                                            <svg className="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                        </div>
+                                        <h4 className="text-xs font-black uppercase tracking-widest mb-2">全量数据分析引擎</h4>
+                                        <p className="text-[10px] text-zinc-600 leading-relaxed mb-8">自动扫描疑点数据，识别潜在财报风险与勾稽异常。</p>
+                                        <button className="w-full py-4 bg-purple-600 rounded-2xl text-[10px] font-black uppercase tracking-widest glow-button transition-all">启动扫描</button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {activeTab === 'AI' && (
+                                <div className="p-4 bg-black border-t border-zinc-800">
+                                    <div className="relative">
+                                        <textarea 
+                                            value={input}
+                                            onChange={e => setInput(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
+                                            placeholder="输入审计指令..." 
+                                            rows={3} 
+                                            className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-xs focus:outline-none focus:border-blue-500/50 resize-none pr-12" 
+                                        />
+                                        <button onClick={handleSend} className="absolute right-3 bottom-3 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </aside>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

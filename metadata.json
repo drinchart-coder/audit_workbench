@@ -1,0 +1,8 @@
+{
+  "name": "AuditPro Workbench",
+  "description": "A high-end, one-stop audit platform for document management, working paper drafting, AI interaction, and off-site data analysis.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
