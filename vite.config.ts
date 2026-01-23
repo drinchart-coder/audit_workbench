@@ -2,17 +2,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   define: {
-    // 关键修复：在浏览器中模拟 process.env，防止应用崩溃
-    'process.env': {
-      API_KEY: process.env.API_KEY || ''
-    }
+    // 确保 process.env 在整个应用中可用
+    'process.env': process.env,
+    'global': {},
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
+    minify: 'terser',
   }
 });
